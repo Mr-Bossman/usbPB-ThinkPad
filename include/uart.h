@@ -1,8 +1,6 @@
 #ifndef __UART_H__
 #define __UART_H__
 
-#include "common.h"
-
 /* Init UART IP */
 void uart_init(uint16_t baud);
 

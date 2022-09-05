@@ -1,4 +1,5 @@
 #include "common.h"
+#include "uart.h"
 
 /* Init UART IP */
 void uart_init(uint16_t baud){
