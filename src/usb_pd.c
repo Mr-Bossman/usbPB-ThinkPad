@@ -2,21 +2,9 @@
 #include "usb_pd.h"
 #include "fusb302.h"
 
-enum  pd_supply_type { fixed = 0, battery = 1, variable = 2, augmented = 3 };
+struct source_capability source_caps[10];
 
-/// Power source capability
-struct source_capability {
-    /// Supply type (fixed, batttery, variable etc.)
-    enum pd_supply_type supply_type;
-    /// Position within message (don't touch)
-    uint8_t obj_pos;
-    /// Maximum current (in mA)
-    uint16_t max_current;
-    /// Voltage (in mV)
-    uint16_t voltage;
-} source_caps[10];
-
-uint8_t num_source_caps = 0;
+volatile uint8_t num_source_caps = 0;
 
 void handle_src_cap_msg(uint16_t header, const uint8_t* payload)
 {
@@ -36,9 +24,6 @@ void handle_src_cap_msg(uint16_t header, const uint8_t* payload)
             voltage = ((payload[2] & 0x0f) * 64 + (payload[1] >> 2)) * 50;
             max_current = ((payload[1] & 0x03) * 256 + payload[0]) * 10;
         }
-	uart_send(voltage>>8);
-	uart_send(voltage);
-	uart_send(0x55);
         source_caps[num_source_caps] = (struct source_capability){
             .supply_type = type,
             .obj_pos = (uint8_t)(obj_pos + 1),

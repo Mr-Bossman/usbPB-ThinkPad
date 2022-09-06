@@ -2,7 +2,7 @@
 #include "printf_uart.h"
 #include "uart.h"
 
-uint8_t uart_tx_buffer[100];
+char uart_tx_buffer[100];
 
 void uart_puts(const char *s)
 {

@@ -66,4 +66,22 @@ static inline uint8_t msg_type(uint16_t header){
 
 void usb_pd_handle_message(uint16_t header, const uint8_t* payload);
 
+enum  pd_supply_type { fixed = 0, battery = 1, variable = 2, augmented = 3 };
+
+/// Power source capability
+struct source_capability {
+    /// Supply type (fixed, batttery, variable etc.)
+    enum pd_supply_type supply_type;
+    /// Position within message (don't touch)
+    uint8_t obj_pos;
+    /// Maximum current (in mA)
+    uint16_t max_current;
+    /// Voltage (in mV)
+    uint16_t voltage;
+};
+
+extern struct source_capability source_caps[10];
+
+extern volatile uint8_t num_source_caps;
+
 #endif /* __USB_PD_H__ */

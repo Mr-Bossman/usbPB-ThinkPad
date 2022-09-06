@@ -2,6 +2,7 @@
 #include "i2c.h"
 #include "uart.h"
 #include "fusb302.h"
+#include "usb_pd.h"
 #include "printf_uart.h"
 
 int main(void){
@@ -16,18 +17,19 @@ int main(void){
 	fusb302_init();
 	fusb302_start_sink();
 	while(1){
-		uart_printf("Device ID: %x", fusb302_id());
-		/*
-		i2c_read(FUSB302_I2C_SLAVE_ADDR, REG_STATUS0, &val);
-		uart_send(val);
-		i2c_read(FUSB302_I2C_SLAVE_ADDR, REG_STATUS1, &val);
-		uart_send(val);
-		i2c_read(FUSB302_I2C_SLAVE_ADDR, REG_STATUS0A, &val);
-		uart_send(val);
-		i2c_read(FUSB302_I2C_SLAVE_ADDR, REG_STATUS1A, &val);
-		uart_send(val);
-		uart_send(0xf0);
-		*/
+		_delay_ms(500);
+		uart_printf("\033[2J\033[HWaiting... %u so far.\n", num_source_caps);
+		for(uint8_t i = 0; i < num_source_caps; i++){
+			uart_puts("Source Capabilities: \n");
+			uart_puts("Supply Type: ");
+			uart_printf("%u\n", source_caps[i].supply_type);
+			uart_puts(" Object Position: ");
+			uart_printf("%u\n", source_caps[i].obj_pos);
+			uart_puts(" Max Current: ");
+			uart_printf("%u\n", source_caps[i].max_current);
+			uart_puts(" Voltage: ");
+			uart_printf("%u\n", source_caps[i].voltage);
+		}
 	}
 	return 0;
 }
