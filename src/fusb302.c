@@ -2,41 +2,19 @@
 #include "fusb302.h"
 #include "i2c.h"
 #include "uart.h"
+#include "usb_pd.h"
 
 volatile uint8_t state = 0;
-
-static inline int fusb302_write(uint8_t reg, uint8_t data){
-	return i2c_send(FUSB302_I2C_SLAVE_ADDR, reg, data);
-}
-
-static inline int fusb302_read(uint8_t reg, uint8_t* data){
-	return i2c_read(FUSB302_I2C_SLAVE_ADDR, reg, data);
-}
-
-static inline bool has_extened(uint16_t header){
-	return (header & 0x8000) != 0;
-}
-
-static inline int num_obj(uint16_t header){
-	return (header >> 12) & 0x7;
-}
-
-static inline int msg_id(uint16_t header){
-	return (header >> 9) & 0x7;
-}
-
-static inline uint8_t msg_type(uint16_t header){
-	return (num_obj(header) != 0) << 7 | (header & 0x1f);
-}
 
 /* Init FUSB302 */
 void fusb302_init(){
 	fusb302_write(REG_RESET, REG_RESET_SW_RESET);
+	_delay_ms(10);
+	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
 	fusb302_write(REG_SWITCHES0, 0x00);
 	fusb302_write(REG_MASK, 0xff);
 	fusb302_write(REG_MASKA, 0xff);
 	fusb302_write(REG_MASKB, REG_MASKB_GCRCSENT);
-	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
 }
 
 /* Get device ID */
@@ -64,8 +42,8 @@ int fusb302_start_sink(){
 	}
 	fusb302_write(REG_MASKA, ~REG_MASKA_TOGDONE);
 	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_UFP << REG_CONTROL2_MODE_POS) | REG_CONTROL2_TOGGLE);
-	fusb302_write(REG_CONTROL0, REG_CONTROL0_HOST_CUR_USB);
 	fusb302_write(REG_CONTROL3, REG_CONTROL3_AUTO_RETRY | (3 << REG_CONTROL3_N_RETRIES_POS));
+	fusb302_write(REG_CONTROL0, REG_CONTROL0_HOST_CUR_USB);
 	state = 1;
 	return 0;
 }
@@ -91,13 +69,14 @@ int fusb302_check_cc_state(){
 		return 1;
 	}
 	/* Not in clecked state */
-	return -2;
+	return -1;
 }
 
 /* Establish usb wait */
 int fusb302_establish_usb_wait(){
 	int cc = fusb302_check_cc_state();
 	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_UFP << REG_CONTROL2_MODE_POS));
+	uart_send(cc);
 	fusb302_write(REG_MASK, ~(REG_MASK_ACTIVITY | REG_MASK_CRC_CHK));
 	fusb302_start_measurement(cc);
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
@@ -146,16 +125,16 @@ int fusb302_check_for_message(){
 		if(val&REG_STATUS1_RX_EMPTY)
 			break;
 		uint16_t header;
-		uint8_t payload[32];
+		uint8_t payload[256];
 		int len = fusb302_read_message(&header, payload);
 		if(fusb302_read(REG_STATUS0, &val))
 			return 2;
 		if((val&REG_STATUS0_CRC_CHK) == 0)
 			continue;
-		if(msg_type(header) == 0x1)
+		if(msg_type(header) == 0x01)
 			continue;
+		usb_pd_handle_message(header, payload);
 		state = 3;
-		return 0;
 	}
 	return 0;
 }
@@ -175,5 +154,7 @@ void fusb302_IRQ(void){
 		} else {
 			state = 0xff;
 		}
+	} else if (state == 3) {
+		fusb302_check_for_message();
 	}
 }

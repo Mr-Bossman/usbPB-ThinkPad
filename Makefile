@@ -3,7 +3,7 @@ CC = avr-gcc
 OBJCP = avr-objcopy
 CFLAGS = -O3 -Wall -Wextra -Wpedantic -DF_CPU=16000000UL -mmcu=atmega328p -Wno-unused-function -Wno-unused-variable
 PORT = /dev/ttyUSB0
-C_SOURCES = src/main.c src/i2c.c src/uart.c src/fusb302.c
+C_SOURCES = src/main.c src/i2c.c src/uart.c src/fusb302.c src/usb_pd.c
 C_INCLUDES = -Iinclude
 CFLAGS += $(C_INCLUDES)
 
