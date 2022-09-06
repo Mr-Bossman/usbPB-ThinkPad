@@ -2,6 +2,7 @@
 #include "i2c.h"
 #include "uart.h"
 #include "fusb302.h"
+#include "printf_uart.h"
 
 int main(void){
 	DDRB = 0xFF;
@@ -15,6 +16,7 @@ int main(void){
 	fusb302_init();
 	fusb302_start_sink();
 	while(1){
+		uart_printf("Device ID: %x", fusb302_id());
 		/*
 		i2c_read(FUSB302_I2C_SLAVE_ADDR, REG_STATUS0, &val);
 		uart_send(val);
