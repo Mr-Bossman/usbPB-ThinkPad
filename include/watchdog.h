@@ -14,7 +14,8 @@ void start_timer();
 /* Get timer value *32ms */
 uint16_t get_timer(void);
 
-extern void (*wdt_callback)(void);
+/* Set callback function for WDT */
+void set_timer_callback(void (*callback)(void));
 
 #define break_out(timeout)if (!wait_for_timerlock(timeout)) break
 

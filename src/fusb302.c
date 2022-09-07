@@ -5,11 +5,18 @@
 #include "usb_pd.h"
 #include "watchdog.h"
 
-volatile uint8_t state = 0;
-uint8_t next_message_id = 0;
+static volatile uint8_t state = 0;
+static uint8_t next_message_id = 0;
+
+/* Get state */
+uint8_t fusb302_get_state()
+{
+	return state;
+}
 
 /* Init FUSB302 */
 void fusb302_init(){
+	state = 0;
 	fusb302_write(REG_RESET, REG_RESET_SW_RESET | REG_RESET_PD_RESET);
 	_delay_ms(10);
 	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
@@ -40,15 +47,6 @@ int fusb302_start_sink(){
 	fusb302_write(REG_CONTROL3, REG_CONTROL3_AUTO_RETRY | (3 << REG_CONTROL3_N_RETRIES_POS));
 	fusb302_write(REG_CONTROL0, REG_CONTROL0_HOST_CUR_USB);
 	state = 1;
-	return 0;
-}
-
-/* Check mesurement */
-int fusb302_check_mesurement(){
-	uint8_t val;
-	if(fusb302_read(REG_STATUS0, &val)) {
-		return 1;
-	}
 	return 0;
 }
 
@@ -97,6 +95,37 @@ int fusb302_write_usbpb(uint8_t* data, size_t sz){
 		if(fusb302_write(REG_FIFOS, data[i]))
 			return 1;
 	return 0;
+}
+
+/* Create and send message */
+void fusb302_send_message(uint16_t header, const uint8_t* payload)
+{
+	header |= (next_message_id << 8);
+	int payload_len = num_obj(header) * 4;
+
+	uint8_t buf[40];
+
+	// Create token stream
+	buf[0] = sop1;
+	buf[1] = sop1;
+	buf[2] = sop1;
+	buf[3] = sop2;
+	buf[4] = packsym | (payload_len + 2);
+	buf[5] = header & 0xff;
+	buf[6] = header >> 8;
+	if (payload_len > 0)
+		memcpy(buf + 7, payload, payload_len);
+	int n = 7 + payload_len;
+	buf[n++] = jam_crc;
+	buf[n++] = eop;
+	buf[n++] = txoff;
+	buf[n++] = txon;
+
+	fusb302_write_usbpb(buf, n);
+
+	next_message_id++;
+	if (next_message_id == 8)
+		next_message_id = 0;
 }
 
 /* Read message */
@@ -150,42 +179,13 @@ void fusb302_IRQ(void){
 	}
 	if (state == 1) {
 		fusb302_establish_usb_wait();
+		start_timer();
 		state = 2;
 	} else if (state == 2) {
-		fusb302_check_for_message();
 		start_timer();
+		fusb302_check_for_message();
 	} else {
 		fusb302_init();
 		fusb302_start_sink();
 	}
-}
-
-void send_message(uint16_t header, const uint8_t* payload)
-{
-    header |= (next_message_id << 8);
-    int payload_len = num_obj(header) * 4;
-
-    uint8_t buf[40];
-
-    // Create token stream
-    buf[0] = sop1;
-    buf[1] = sop1;
-    buf[2] = sop1;
-    buf[3] = sop2;
-    buf[4] = packsym | (payload_len + 2);
-    buf[5] = header & 0xff;
-    buf[6] = header >> 8;
-    if (payload_len > 0)
-        memcpy(buf + 7, payload, payload_len);
-    int n = 7 + payload_len;
-    buf[n++] = jam_crc;
-    buf[n++] = eop;
-    buf[n++] = txoff;
-    buf[n++] = txon;
-
-    fusb302_write_usbpb(buf, n);
-
-    next_message_id++;
-    if (next_message_id == 8)
-        next_message_id = 0;
 }

@@ -2,10 +2,15 @@
 #include "watchdog.h"
 #include <avr/wdt.h>
 
-void (*wdt_callback)(void) = NULL;
+static void (*wdt_callback)(void) = NULL;
 
 static volatile uint16_t timerlock = 0;
 static volatile uint16_t timer = 0;
+
+void set_timer_callback(void (*callback)(void))
+{
+	wdt_callback = callback;
+}
 
 /* Wait for timeout period *32ms */
 bool wait_for_timerlock(uint16_t timeout)

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "uart.h"
+#include "watchdog.h"
 
 /* Init UART IP */
 void uart_init(uint16_t baud){
@@ -16,7 +17,7 @@ void uart_init(uint16_t baud){
 /* Send byte to UART */
 void uart_send(uint8_t data){
 	// Wait for empty transmit buffer
-	while(!(UCSR0A & (1<<UDRE0)));
+	while(!(UCSR0A & (1<<UDRE0))) break_out(1);
 	// Put data into buffer, sends the data
 	UDR0 = data;
 }
