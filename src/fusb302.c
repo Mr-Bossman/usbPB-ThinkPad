@@ -10,7 +10,7 @@ uint8_t next_message_id = 0;
 
 /* Init FUSB302 */
 void fusb302_init(){
-	fusb302_write(REG_RESET, REG_RESET_SW_RESET);
+	fusb302_write(REG_RESET, REG_RESET_SW_RESET | REG_RESET_PD_RESET);
 	_delay_ms(10);
 	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
 	fusb302_write(REG_SWITCHES0, 0x00);
@@ -22,11 +22,6 @@ void fusb302_init(){
 /* Get device ID */
 int fusb302_id(uint8_t* id){
 	return fusb302_read(REG_DEVICE_ID, id);
-}
-
-/* Start measurement */
-int fusb302_start_measurement(bool cc) {
-	return fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
 }
 
 /* Reset FUSB302 */
@@ -75,9 +70,14 @@ int fusb302_check_cc_state(){
 /* Establish usb wait */
 int fusb302_establish_usb_wait(){
 	int cc = fusb302_check_cc_state();
+	if(cc == -1) {
+		fusb302_init();
+		fusb302_start_sink();
+		return 1;
+	}
 	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_UFP << REG_CONTROL2_MODE_POS));
 	fusb302_write(REG_MASK, ~(REG_MASK_ACTIVITY | REG_MASK_CRC_CHK));
-	fusb302_start_measurement(cc);
+	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
 	fusb302_write(REG_CONTROL0, 0x00);
 	return 0;
@@ -143,18 +143,20 @@ void fusb302_IRQ(void){
 	fusb302_read(REG_INTERRUPT, &intr[0]);
 	fusb302_read(REG_INTERRUPTA, &intr[1]);
 	fusb302_read(REG_INTERRUPTB, &intr[2]);
+	if(!(intr[0] || intr[1] |intr[2])) {
+			fusb302_init();
+			fusb302_start_sink();
+			return;
+	}
 	if (state == 1) {
 		fusb302_establish_usb_wait();
 		state = 2;
 	} else if (state == 2) {
-		//if(intr[0]&REG_INTERRUPT_ACTIVITY){
-			state = 3;
-			fusb302_check_for_message();
-		//} else {
-		//	state = 0xff;
-		//}//
-	} else if (state == 3) {
 		fusb302_check_for_message();
+		start_timer();
+	} else {
+		fusb302_init();
+		fusb302_start_sink();
 	}
 }
 

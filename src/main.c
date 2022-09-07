@@ -8,7 +8,10 @@
 
 void timer_callback(void)
 {
-
+	if(state == 2 && get_timer() > 20) {
+		fusb302_init();
+		fusb302_start_sink();
+	}
 }
 
 int main(void){
@@ -25,7 +28,7 @@ int main(void){
 	fusb302_init();
 	fusb302_start_sink();
 	while(1){
-		uart_printf("\033[2J\033[HWaiting... %u so far. state %d\n", num_source_caps,state);
+		/*uart_printf("\033[2J\033[HWaiting... %u so far. state %d\n", num_source_caps,state);
 		for(uint8_t i = 0; i < num_source_caps; i++){
 			PORTB = (1<<PB5);
 			uart_puts("Source Capabilities: \n");
@@ -38,7 +41,7 @@ int main(void){
 			uart_puts(" Voltage: ");
 			uart_printf("%u\n", source_caps[i].voltage);
 		}
-		_delay_ms(500);
+		_delay_ms(500);*/
 	}
 	return 0;
 }

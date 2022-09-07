@@ -42,7 +42,6 @@ void usb_pd_handle_message(uint16_t header, const uint8_t* payload){
 	switch (type) {
 		case data_source_capabilities:
 			handle_src_cap_msg(header, payload);
-			request_power(5000,1000);
 		break;
     		default:
 		break;
