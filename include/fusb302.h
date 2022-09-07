@@ -180,9 +180,10 @@
 
 void fusb302_init();
 int fusb302_reset();
-uint8_t fusb302_id();
+int fusb302_id(uint8_t *id);
 int fusb302_start_sink();
 int fusb302_check_cc_state();
 void fusb302_IRQ(void);
+extern volatile uint8_t state;
 
 #endif /* __FUSB302_H */

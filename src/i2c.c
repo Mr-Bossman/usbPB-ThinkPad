@@ -1,5 +1,6 @@
 #include "common.h"
 #include "i2c.h"
+#include "watchdog.h"
 #include <util/twi.h>
 
 /* Init I2C IP */
@@ -15,7 +16,7 @@ void i2c_init(){
 /* Send start condition */
 static void i2c_start(){
     TWCR = (1<<TWINT)|(1<<TWSTA)|(1<<TWEN);
-    while ((TWCR & (1<<TWINT)) == 0);
+    while ((TWCR & (1<<TWINT)) == 0) break_out(1);
 }
 
 /* Send stop condition */
@@ -27,20 +28,20 @@ static void i2c_stop(void){
 static void i2c_write(uint8_t data){
     TWDR = data;
     TWCR = (1<<TWINT)|(1<<TWEN);
-    while ((TWCR & (1<<TWINT)) == 0);
+    while ((TWCR & (1<<TWINT)) == 0) break_out(1);
 }
 
 /* Read byte with ACK */
 static uint8_t i2c_readACK(){
     TWCR = (1<<TWINT)|(1<<TWEN)|(1<<TWEA);
-    while ((TWCR & (1<<TWINT)) == 0);
+    while ((TWCR & (1<<TWINT)) == 0) break_out(1);
     return TWDR;
 }
 
 /* Read byte with NACK */
 static uint8_t i2c_readNACK(){
     TWCR = (1<<TWINT)|(1<<TWEN);
-    while ((TWCR & (1<<TWINT)) == 0);
+    while ((TWCR & (1<<TWINT)) == 0) break_out(1);
     return TWDR;
 }
 

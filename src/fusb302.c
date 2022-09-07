@@ -3,6 +3,7 @@
 #include "i2c.h"
 #include "uart.h"
 #include "usb_pd.h"
+#include "watchdog.h"
 
 volatile uint8_t state = 0;
 
@@ -18,10 +19,8 @@ void fusb302_init(){
 }
 
 /* Get device ID */
-uint8_t fusb302_id(){
-	uint8_t val;
-	fusb302_read(REG_DEVICE_ID, &val);
-	return val;
+int fusb302_id(uint8_t* id){
+	return fusb302_read(REG_DEVICE_ID, id);
 }
 
 /* Start measurement */
@@ -134,7 +133,6 @@ int fusb302_check_for_message(){
 		if(msg_type(header) == 0x01)
 			continue;
 		usb_pd_handle_message(header, payload);
-		state = 3;
 	}
 	return 0;
 }
@@ -149,11 +147,12 @@ void fusb302_IRQ(void){
 		fusb302_establish_usb_wait();
 		state = 2;
 	} else if (state == 2) {
-		if(intr[0]&REG_INTERRUPT_ACTIVITY){
+		//if(intr[0]&REG_INTERRUPT_ACTIVITY){
+			state = 3;
 			fusb302_check_for_message();
-		} else {
-			state = 0xff;
-		}
+		//} else {
+		//	state = 0xff;
+		//}//
 	} else if (state == 3) {
 		fusb302_check_for_message();
 	}

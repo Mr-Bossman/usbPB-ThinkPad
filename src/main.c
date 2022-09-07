@@ -4,21 +4,28 @@
 #include "fusb302.h"
 #include "usb_pd.h"
 #include "printf_uart.h"
+#include "watchdog.h"
+
+void timer_callback(void)
+{
+
+}
 
 int main(void){
 	DDRB = 0xFF;
 	PORTD = (1<<PD2);
 	EICRA = (1<<ISC01);
 	EIMSK |= (1<<INT0);
-	sei();
 	uart_init(9600);
-	uint8_t val;
+	watchdog_init();
+	start_timer();
+	wdt_callback = timer_callback;
+	sei();
 	i2c_init();
 	fusb302_init();
 	fusb302_start_sink();
 	while(1){
-		_delay_ms(500);
-		uart_printf("\033[2J\033[HWaiting... %u so far.\n", num_source_caps);
+		uart_printf("\033[2J\033[HWaiting... %u so far. state %d\n", num_source_caps,state);
 		for(uint8_t i = 0; i < num_source_caps; i++){
 			uart_puts("Source Capabilities: \n");
 			uart_puts("Supply Type: ");
@@ -30,6 +37,7 @@ int main(void){
 			uart_puts(" Voltage: ");
 			uart_printf("%u\n", source_caps[i].voltage);
 		}
+		_delay_ms(500);
 	}
 	return 0;
 }
