@@ -184,6 +184,8 @@ void fusb302_IRQ(void){
 	} else if (state == 2) {
 		start_timer();
 		fusb302_check_for_message();
+		/* Send ping so I dont get shut off */
+		usb_pd_request_power(5000,1);
 	} else {
 		fusb302_init();
 		fusb302_start_sink();
