@@ -185,5 +185,6 @@ int fusb302_start_sink();
 int fusb302_check_cc_state();
 void fusb302_IRQ(void);
 extern volatile uint8_t state;
+void send_message(uint16_t header, const uint8_t* payload);
 
 #endif /* __FUSB302_H */

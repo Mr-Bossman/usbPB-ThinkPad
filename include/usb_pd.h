@@ -63,10 +63,27 @@ static inline uint8_t msg_type(uint16_t header){
 	return (num_obj(header) != 0) << 7 | (header & 0x1f);
 }
 
+static inline uint16_t create_header(uint8_t msg_type, int num_obj){
+        return ((num_obj & 0x07) << 12) | (msg_type & 0x1f) | 0x40;
+}
 
 void usb_pd_handle_message(uint16_t header, const uint8_t* payload);
+void request_power(uint16_t voltage, uint16_t max_current);
 
 enum  pd_supply_type { fixed = 0, battery = 1, variable = 2, augmented = 3 };
+
+enum  {
+    txon = 0xa1,
+    sop1 = 0x12,
+    sop2 = 0x13,
+    sop3 = 0x1b,
+    reset1 = 0x15,
+    reset2 = 0x16,
+    packsym = 0x80,
+    jam_crc = 0xff,
+    eop = 0x14,
+    txoff = 0xfe
+};
 
 /// Power source capability
 struct source_capability {

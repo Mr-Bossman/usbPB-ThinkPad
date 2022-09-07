@@ -42,8 +42,37 @@ void usb_pd_handle_message(uint16_t header, const uint8_t* payload){
 	switch (type) {
 		case data_source_capabilities:
 			handle_src_cap_msg(header, payload);
+			request_power(5000,1000);
 		break;
     		default:
 		break;
     	}
+}
+
+void request_power(uint16_t voltage, uint16_t max_current)
+{
+    // Lookup object position by voltage
+    int obj_pos = -1;
+    for (int i = 0; i < num_source_caps; i++)
+        if (source_caps[i].voltage == voltage)
+            obj_pos = source_caps[i].obj_pos;
+    if (obj_pos == -1)
+        return; // no match
+
+    // Create 'request' message
+    const uint8_t no_usb_suspend = 1;
+    const uint8_t usb_comm_capable = 2;
+    uint8_t payload[4];
+
+    uint16_t curr = (max_current + 5) / 10;
+    if (curr > 0x3ff)
+        curr = 0x3ff;
+    payload[0] = curr & 0xff;
+    payload[1] = ((curr >> 8) & 0x03) | ((curr << 2) & 0xfc);
+    payload[2] = (curr >> 6) & 0x0f;
+    payload[3] = (obj_pos & 0x07) << 4 | no_usb_suspend | usb_comm_capable;
+    uint16_t header = create_header(data_request, 1);
+
+    // Send message
+   send_message(header, payload);
 }
