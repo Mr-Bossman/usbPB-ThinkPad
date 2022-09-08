@@ -8,10 +8,7 @@
 
 void timer_callback(void)
 {
-	if(fusb302_get_state() == 2 && get_timer() > 50) {
-		fusb302_init();
-		fusb302_start_sink();
-	}
+
 }
 
 int main(void){
