@@ -3,6 +3,7 @@ build/*
 !build/.hidden
 
 # KICAD
+**.zip
 **/**-backups/
 **\#auto_saved_files\#
 **.kicad_prl
