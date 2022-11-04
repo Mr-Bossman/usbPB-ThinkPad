@@ -1,23 +1,22 @@
 #include "common.h"
 #include "uart.h"
-#include "watchdog.h"
+#include "pit.h"
 
 /* Init UART IP */
-void uart_init(uint16_t baud){
+void uart_init(uint32_t baud){
 	// Set baud rate
-	uint16_t tmp = (F_CPU/16UL)/baud-1;
-	UBRR0H = (uint8_t)(tmp>>8);
-	UBRR0L = (uint8_t)tmp;
-	// Enable receiver and transmitter
-	UCSR0B = (1<<RXEN0)|(1<<TXEN0);
+	uint16_t tmp = (F_CPU*16ULL)/(uint32_t)baud;
+	USART0.BAUD = (tmp+1)>>1;
+	// Enable transmitter
+	USART0.CTRLB = USART_TXEN_bm | USART_RXMODE_CLK2X_gc;
 	// Set frame format: 8data, 2stop bit
-	UCSR0C = (1<<USBS0)|(3<<UCSZ00);
+	USART0.CTRLC = USART_SBMODE_2BIT_gc | USART_CHSIZE_8BIT_gc;
 }
 
 /* Send byte to UART */
 void uart_send(uint8_t data){
 	// Wait for empty transmit buffer
-	while(!(UCSR0A & (1<<UDRE0))) break_out(1);
+	while(!(USART0.STATUS & USART_DREIF_bm)) break_out(1);
 	// Put data into buffer, sends the data
-	UDR0 = data;
+	USART0.TXDATAL = data;
 }

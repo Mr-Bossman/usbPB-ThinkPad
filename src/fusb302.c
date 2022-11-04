@@ -3,7 +3,7 @@
 #include "i2c.h"
 #include "uart.h"
 #include "usb_pd.h"
-#include "watchdog.h"
+#include "pit.h"
 
 static volatile uint8_t state = 0;
 static uint8_t next_message_id = 0;

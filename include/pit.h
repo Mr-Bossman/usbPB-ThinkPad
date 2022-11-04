@@ -1,9 +1,9 @@
-#ifndef __WATCHDOG_H__
-#define __WATCHDOG_H__
+#ifndef __PIT_H__
+#define __PIT_H__
 
 
-/* Init watchdog timer */
-void watchdog_init();
+/* Init Pit timer */
+void pit_init();
 
 /* Wait for timeout period *32ms */
 bool wait_for_timerlock(uint16_t timeout);
@@ -19,4 +19,4 @@ void set_timer_callback(void (*callback)(void));
 
 #define break_out(timeout)if (!wait_for_timerlock(timeout)) break
 
-#endif /* __WATCHDOG_H__ */
+#endif /* __PIT_H__ */

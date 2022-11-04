@@ -2,7 +2,7 @@
 #define __UART_H__
 
 /* Init UART IP */
-void uart_init(uint16_t baud);
+void uart_init(uint32_t baud);
 
 /* Send byte to UART */
 void uart_send(uint8_t data);

@@ -1,15 +1,14 @@
 #include "common.h"
-#include "watchdog.h"
-#include <avr/wdt.h>
+#include "pit.h"
 
-static void (*wdt_callback)(void) = NULL;
+static void (*pit_callback)(void) = NULL;
 
 static volatile uint16_t timerlock = 0;
 static volatile uint16_t timer = 0;
 
 void set_timer_callback(void (*callback)(void))
 {
-	wdt_callback = callback;
+	pit_callback = callback;
 }
 
 /* Wait for timeout period *32ms */
@@ -36,18 +35,20 @@ uint16_t get_timer(void)
 	return timer;
 }
 
-/* Init Watchdog timer */
-void watchdog_init() {
-	// Set Watchdog prescaler to 32ms and Enable Interrupt
-	WDTCSR = (1<<WDP0) | (1<<WDIE);
-	wdt_reset();
+/* Init Pit timer */
+void pit_init() {
+	// Set Pit prescaler to 32ms and Enable Interrupt
+	RTC.CTRLA = RTC_PRESCALER_DIV1_gc | RTC_RTCEN_bm;
+	RTC.PITCTRLA = RTC_PERIOD_CYC1024_gc | RTC_PITEN_bm;
+	RTC.PITINTCTRL = RTC_PI_bm;
 }
 
-/* Watchdog interrupt */
-ISR(WDT_vect) {
+/* Pit interrupt */
+ISR(RTC_PIT_vect) {
 	if(timerlock > 0)
 		timerlock--;
 	timer++;
-	if(wdt_callback != NULL)
-		wdt_callback();
+	if(pit_callback != NULL)
+		pit_callback();
+	RTC.PITINTFLAGS = RTC_PI_bm;
 }

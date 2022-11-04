@@ -4,7 +4,7 @@
 #include "fusb302.h"
 #include "usb_pd.h"
 #include "printf_uart.h"
-#include "watchdog.h"
+#include "pit.h"
 
 void timer_callback(void)
 {
@@ -12,14 +12,17 @@ void timer_callback(void)
 }
 
 int main(void){
-	DDRB = 0xFF;
-	/* Pullups on INT0 */
-	PORTD |= (1<<PD2);
-	/* Init INT0 falling EDG */
-	EICRA = (1<<ISC01);
-	EIMSK |= (1<<INT0);
-	uart_init(9600);
-	watchdog_init();
+	/* Set F_CPU to 20MHz */
+	CPU_CCP = 0xD8;
+	CLKCTRL_MCLKCTRLA = CLKCTRL_CLKSEL_OSC20M_gc;
+	CPU_CCP = 0xD8;
+	CLKCTRL_MCLKCTRLB = 0;
+	/* set PORTB as output */
+	PORTB.DIRSET = 0xFF;
+	/* Pullups on PB4 and INT falling edge */
+	PORTB.PIN4CTRL = PORT_PULLUPEN_bm | PORT_ISC_FALLING_gc;
+	uart_init(115200);
+	pit_init();
 	start_timer();
 	set_timer_callback(timer_callback);
 	sei();
@@ -42,6 +45,9 @@ int main(void){
 	return 0;
 }
 
-ISR(INT0_vect){
-	fusb302_IRQ();
+ISR(PORTB_PORT_vect){
+	if(PORTB.INTFLAGS & PORT_INT4_bm) {
+		PORTB.INTFLAGS = PORT_INT4_bm;
+		fusb302_IRQ();
+	}
 }
