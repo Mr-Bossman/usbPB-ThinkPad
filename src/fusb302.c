@@ -172,7 +172,7 @@ void fusb302_IRQ(void){
 	fusb302_read(REG_INTERRUPT, &intr[0]);
 	fusb302_read(REG_INTERRUPTA, &intr[1]);
 	fusb302_read(REG_INTERRUPTB, &intr[2]);
-	if(!(intr[0] || intr[1] |intr[2])) {
+	if(!(intr[0] || intr[1] || intr[2])) {
 			fusb302_init();
 			fusb302_start_sink();
 			return;
@@ -182,6 +182,7 @@ void fusb302_IRQ(void){
 		start_timer();
 		state = 2;
 	} else if (state == 2) {
+		state = 3;
 		start_timer();
 		fusb302_check_for_message();
 		/* Send ping so I dont get shut off */
