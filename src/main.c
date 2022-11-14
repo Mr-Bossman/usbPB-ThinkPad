@@ -8,10 +8,10 @@
 
 void timer_callback(void)
 {
-	/*if(fusb302_get_state() == 2 && get_timer() > 100){
+	if(fusb302_get_state() == PD_STATE_WAIT && get_timer() > 20){
 			fusb302_init();
 			fusb302_start_sink();
-	}*/
+	}
 
 }
 
@@ -38,7 +38,12 @@ int main(void){
 	fusb302_start_sink();
 	while(1){
 		while(usb_pd_get_source_caps(NULL) == 0) {
-			uart_printf("\rWaiting for source caps... State: %d, %d", fusb302_get_state(),get_timer());
+			uart_printf("\n\rWaiting for source caps... State: %d, %d", fusb302_get_state(),get_timer());
+					uint8_t intr[3];
+		fusb302_read(REG_STATUS0, &intr[0]);
+		fusb302_read(REG_MASK, &intr[1]);
+		fusb302_read(REG_STATUS1A, &intr[2]);
+		uart_printf("\n\rterrupts: 0x%x 0x%x 0x%x\n\r", intr[0], intr[1], intr[2]);
 			_delay_ms(100);
 		}
 		uart_printf("\n\n\rGot source caps! State: %d\n\r", fusb302_get_state());
@@ -47,7 +52,6 @@ int main(void){
 		for(int i = 0; i < num_caps; i++) {
 			uart_printf("Voltage: %u, Current: %u, Type: %u, Obj_pos: %u\n\r", tmp[i].voltage, tmp[i].max_current, tmp[i].supply_type, tmp[i].obj_pos);
 		}
-		//usb_pd_reset_source_caps();
 		_delay_ms(1000);
 	}
 	return 0;

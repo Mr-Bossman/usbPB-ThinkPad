@@ -116,7 +116,7 @@
 #define REG_STATUS0A_RETRYFAIL (1<<4)
 #define REG_STATUS0A_POWER     (1<<2) /* two-bit field */
 #define REG_STATUS0A_RX_SOFT_RESET (1<<1)
-#define REG_STATUS0A_RX_HARD_RESEt (1<<0)
+#define REG_STATUS0A_RX_HARD_RESET (1<<0)
 
 #define REG_STATUS1A   0x3D
 /* three-bit field, valid values below */
@@ -185,5 +185,9 @@ int fusb302_start_sink();
 void fusb302_IRQ(void);
 uint8_t fusb302_get_state();
 void fusb302_send_message(uint16_t header, const uint8_t* payload);
+
+#define PD_STATE_2_0 1
+#define PD_STATE_WAIT 2
+#define PD_STATE_PD 3
 
 #endif /* __FUSB302_H */

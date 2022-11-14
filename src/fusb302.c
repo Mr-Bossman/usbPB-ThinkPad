@@ -4,10 +4,8 @@
 #include "uart.h"
 #include "usb_pd.h"
 #include "pit.h"
+#include "printf_uart.h"
 
-#define PD_STATE_2_0 1
-#define PD_STATE_WAIT 2
-#define PD_STATE_PD 3
 static volatile uint8_t state = 0;
 static uint8_t next_message_id = 0;
 
@@ -24,7 +22,12 @@ void fusb302_init(){
 	_delay_ms(10);
 	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
 	fusb302_write(REG_SWITCHES0, 0x00);
-	fusb302_write(REG_MASK, 0xff);
+	uint8_t tmp = 0;
+	fusb302_read(REG_STATUS0, &tmp);
+	if(tmp & REG_STATUS0_VBUSOK)
+		fusb302_write(REG_MASK, 0xff);
+	else
+		fusb302_write(REG_MASK, ~REG_MASK_VBUSOK);
 	fusb302_write(REG_MASKA, 0xff);
 	fusb302_write(REG_MASKB, REG_MASKB_GCRCSENT);
 }
@@ -154,6 +157,7 @@ static int fusb302_check_for_message(){
 	int ret = 0;
 	while(1){
 		uint8_t val;
+		_delay_us(100);
 		if(fusb302_read(REG_STATUS1, &val))
 			return -1;
 		if(val&REG_STATUS1_RX_EMPTY)
@@ -179,6 +183,8 @@ void fusb302_IRQ(void){
 	fusb302_read(REG_INTERRUPT, &intr[0]);
 	fusb302_read(REG_INTERRUPTA, &intr[1]);
 	fusb302_read(REG_INTERRUPTB, &intr[2]);
+	if(intr[0] & REG_INTERRUPT_VBUSOK)
+		fusb302_write(REG_MASK, 0xff);
 	if(intr[1]&REG_INTERRUPTA_TX_SUCCESS)
 		return;
 	if (state == PD_STATE_2_0) {
