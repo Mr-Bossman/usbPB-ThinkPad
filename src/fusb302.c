@@ -5,6 +5,9 @@
 #include "usb_pd.h"
 #include "pit.h"
 
+#define PD_STATE_2_0 1
+#define PD_STATE_WAIT 2
+#define PD_STATE_PD 3
 static volatile uint8_t state = 0;
 static uint8_t next_message_id = 0;
 
@@ -46,12 +49,12 @@ int fusb302_start_sink(){
 	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_UFP << REG_CONTROL2_MODE_POS) | REG_CONTROL2_TOGGLE);
 	fusb302_write(REG_CONTROL3, REG_CONTROL3_AUTO_RETRY | (3 << REG_CONTROL3_N_RETRIES_POS));
 	fusb302_write(REG_CONTROL0, REG_CONTROL0_HOST_CUR_USB);
-	state = 1;
+	state = PD_STATE_2_0;
 	return 0;
 }
 
 /* Check cc state */
-int fusb302_check_cc_state(){
+static int fusb302_check_cc_state(){
 	uint8_t val;
 	if(fusb302_read(REG_STATUS1A, &val)) {
 		return -1;
@@ -65,10 +68,10 @@ int fusb302_check_cc_state(){
 	return -1;
 }
 
-/* Establish usb wait */
-int fusb302_establish_usb_wait(){
+/* Establish usb pd wait */
+static int fusb302_establish_pd_wait(){
 	int cc = fusb302_check_cc_state();
-	if(cc == -1) {
+	if(cc == -1 || state == PD_STATE_WAIT) {
 		fusb302_init();
 		fusb302_start_sink();
 		return 1;
@@ -78,11 +81,13 @@ int fusb302_establish_usb_wait(){
 	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
 	fusb302_write(REG_CONTROL0, 0x00);
+	state = PD_STATE_WAIT;
+	start_timer();
 	return 0;
 }
 
 /* Read usbPB data */
-int fusb302_read_usbpb(uint8_t* data, size_t sz){
+static int fusb302_read_usbpb(uint8_t* data, size_t sz){
 	for(size_t i = 0; i < sz; i++)
 		if(fusb302_read(REG_FIFOS, &data[i]))
 			return 1;
@@ -90,7 +95,7 @@ int fusb302_read_usbpb(uint8_t* data, size_t sz){
 }
 
 /* Write usbPB data */
-int fusb302_write_usbpb(uint8_t* data, size_t sz){
+static int fusb302_write_usbpb(uint8_t* data, size_t sz){
 	for(size_t i = 0; i < sz; i++)
 		if(fusb302_write(REG_FIFOS, data[i]))
 			return 1;
@@ -129,7 +134,7 @@ void fusb302_send_message(uint16_t header, const uint8_t* payload)
 }
 
 /* Read message */
-int fusb302_read_message(uint16_t* header, uint8_t* payload){
+static int fusb302_read_message(uint16_t* header, uint8_t* payload){
 	uint8_t data[3];
 	if(fusb302_read_usbpb(data, 3))
 		return 1;
@@ -144,26 +149,28 @@ int fusb302_read_message(uint16_t* header, uint8_t* payload){
 	return len;
 }
 
-/* Check for message */
-int fusb302_check_for_message(){
+/* Check for message <0 err 0 is no pd 1 is pd*/
+static int fusb302_check_for_message(){
+	int ret = 0;
 	while(1){
 		uint8_t val;
 		if(fusb302_read(REG_STATUS1, &val))
-			return 1;
+			return -1;
 		if(val&REG_STATUS1_RX_EMPTY)
 			break;
-		uint16_t header;
+		uint16_t header = 0;
 		uint8_t payload[256];
 		int len = fusb302_read_message(&header, payload);
 		if(fusb302_read(REG_STATUS0, &val))
-			return 2;
+			return -2;
 		if((val&REG_STATUS0_CRC_CHK) == 0)
 			continue;
 		if(msg_type(header) == 0x01)
 			continue;
+		ret = 1;
 		usb_pd_handle_message(header, payload);
 	}
-	return 0;
+	return ret;
 }
 
 /* Global fusb302 interrupt handler */
@@ -172,23 +179,22 @@ void fusb302_IRQ(void){
 	fusb302_read(REG_INTERRUPT, &intr[0]);
 	fusb302_read(REG_INTERRUPTA, &intr[1]);
 	fusb302_read(REG_INTERRUPTB, &intr[2]);
-	if(!(intr[0] || intr[1] || intr[2])) {
-			fusb302_init();
-			fusb302_start_sink();
-			return;
-	}
-	if (state == 1) {
-		fusb302_establish_usb_wait();
-		start_timer();
-		state = 2;
-	} else if (state == 2) {
-		state = 3;
-		start_timer();
+	if(intr[1]&REG_INTERRUPTA_TX_SUCCESS)
+		return;
+	if (state == PD_STATE_2_0) {
+		fusb302_establish_pd_wait();
+	} else if (state == PD_STATE_WAIT) {
+		//if((intr[0]&REG_INTERRUPT_ACTIVITY) || (intr[0]&REG_INTERRUPT_CRC_CHK) || (intr[1]&REG_INTERRUPTB_GCRCSENT)){
+			if(fusb302_check_for_message() == 1)
+				state = PD_STATE_PD;
+			/* Send ping so I dont get shut off */
+			usb_pd_request_power(5000,900);
+		//} else {
+			//fusb302_establish_pd_wait();
+		//}
+	} else if (state == PD_STATE_PD){
 		fusb302_check_for_message();
 		/* Send ping so I dont get shut off */
-		usb_pd_request_power(5000,1);
-	} else {
-		fusb302_init();
-		fusb302_start_sink();
+		usb_pd_request_power(5000,900);
 	}
 }

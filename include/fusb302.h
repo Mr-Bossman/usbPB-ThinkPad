@@ -182,7 +182,6 @@ void fusb302_init();
 int fusb302_reset();
 int fusb302_id(uint8_t *id);
 int fusb302_start_sink();
-int fusb302_check_cc_state();
 void fusb302_IRQ(void);
 uint8_t fusb302_get_state();
 void fusb302_send_message(uint16_t header, const uint8_t* payload);

@@ -28,6 +28,7 @@ int main(void){
 	/* Pullups on PB4 and INT falling edge */
 	PORTB.PIN4CTRL = PORT_PULLUPEN_bm | PORT_ISC_FALLING_gc;
 	uart_init(115200);
+	uart_puts("\e[2J\e[1;1H");
 	pit_init();
 	start_timer();
 	set_timer_callback(timer_callback);
