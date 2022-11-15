@@ -140,15 +140,15 @@ void fusb302_send_message(uint16_t header, const uint8_t* payload)
 static int fusb302_read_message(uint16_t* header, uint8_t* payload){
 	uint8_t data[3];
 	if(fusb302_read_usbpb(data, 3))
-		return 1;
+		return -1;
 	if((data[0]&0xe0) != 0xe0){
 		fusb302_write(REG_CONTROL1, REG_CONTROL1_RX_FLUSH);
-		return 2;
+		return -2;
 	}
 	header[0] = (data[1] << 8) | data[2];
 	uint8_t len = num_obj(header[0]) * 4;
 	if(fusb302_read_usbpb(payload, len+4))
-		return 3;
+		return -3;
 	return len;
 }
 
@@ -156,8 +156,7 @@ static int fusb302_read_message(uint16_t* header, uint8_t* payload){
 static int fusb302_check_for_message(){
 	int ret = 0;
 	while(1){
-		uint8_t val;
-		_delay_us(100);
+		uint8_t val = 0;
 		if(fusb302_read(REG_STATUS1, &val))
 			return -1;
 		if(val&REG_STATUS1_RX_EMPTY)
@@ -183,24 +182,38 @@ void fusb302_IRQ(void){
 	fusb302_read(REG_INTERRUPT, &intr[0]);
 	fusb302_read(REG_INTERRUPTA, &intr[1]);
 	fusb302_read(REG_INTERRUPTB, &intr[2]);
-	if(intr[0] & REG_INTERRUPT_VBUSOK)
-		fusb302_write(REG_MASK, 0xff);
+	uart_printf("\n\rstate: %d. interrupts: 0x%x 0x%x 0x%x\n\r",state, intr[0], intr[1], intr[2]);
+	if(intr[0] & REG_INTERRUPT_VBUSOK) {
+		uint8_t tmp = 0;
+		fusb302_read(REG_STATUS0, &tmp);
+		if(tmp & REG_STATUS0_VBUSOK)
+			fusb302_write(REG_MASK, 0xff);
+		else {
+			fusb302_init();
+			fusb302_start_sink();
+			usb_pd_reset_source_caps();
+		}
+
+	}
 	if(intr[1]&REG_INTERRUPTA_TX_SUCCESS)
 		return;
 	if (state == PD_STATE_2_0) {
 		fusb302_establish_pd_wait();
 	} else if (state == PD_STATE_WAIT) {
-		//if((intr[0]&REG_INTERRUPT_ACTIVITY) || (intr[0]&REG_INTERRUPT_CRC_CHK) || (intr[1]&REG_INTERRUPTB_GCRCSENT)){
-			if(fusb302_check_for_message() == 1)
-				state = PD_STATE_PD;
+		if(fusb302_check_for_message() == 1){
+			start_timer();
+			state = PD_STATE_PD;
+			fusb302_write(REG_MASK, ~(REG_INTERRUPT_VBUSOK));
+			fusb302_write(REG_MASKA, 0xff);
 			/* Send ping so I dont get shut off */
 			usb_pd_request_power(5000,900);
-		//} else {
-			//fusb302_establish_pd_wait();
-		//}
+		}
 	} else if (state == PD_STATE_PD){
-		fusb302_check_for_message();
-		/* Send ping so I dont get shut off */
-		usb_pd_request_power(5000,900);
+		start_timer();
+		uint8_t val = 0;
+		if(fusb302_read(REG_STATUS1, &val))
+			return;
+		if(!(val&REG_STATUS1_RX_EMPTY))
+			fusb302_write(REG_CONTROL1, REG_CONTROL1_RX_FLUSH);
 	}
 }

@@ -12,7 +12,11 @@ void timer_callback(void)
 			fusb302_init();
 			fusb302_start_sink();
 	}
-
+	if(!(PORTB.INTFLAGS&PORT_INT4_bm) && !(PORTB.IN&(1<<4)) && get_timer() > 30){
+			fusb302_init();
+			fusb302_start_sink();
+			usb_pd_reset_source_caps();
+	}
 }
 
 int main(void){
@@ -28,7 +32,7 @@ int main(void){
 	/* Pullups on PB4 and INT falling edge */
 	PORTB.PIN4CTRL = PORT_PULLUPEN_bm | PORT_ISC_FALLING_gc;
 	uart_init(115200);
-	uart_puts("\e[2J\e[1;1H");
+	uart_puts("\e[2J\e[1;1H\n\n");
 	pit_init();
 	start_timer();
 	set_timer_callback(timer_callback);
@@ -37,13 +41,12 @@ int main(void){
 	fusb302_init();
 	fusb302_start_sink();
 	while(1){
+		uint8_t intr[3];
 		while(usb_pd_get_source_caps(NULL) == 0) {
-			uart_printf("\n\rWaiting for source caps... State: %d, %d", fusb302_get_state(),get_timer());
-					uint8_t intr[3];
-		fusb302_read(REG_STATUS0, &intr[0]);
-		fusb302_read(REG_MASK, &intr[1]);
-		fusb302_read(REG_STATUS1A, &intr[2]);
-		uart_printf("\n\rterrupts: 0x%x 0x%x 0x%x\n\r", intr[0], intr[1], intr[2]);
+			fusb302_read(REG_STATUS0, &intr[0]);
+			fusb302_read(REG_STATUS1, &intr[1]);
+			fusb302_read(REG_STATUS1A, &intr[2]);
+			uart_printf("\rWaiting for source caps... State: %d, Time: %d. Status: 0x%x 0x%x 0x%x\r", fusb302_get_state(),get_timer(), intr[0], intr[1], intr[2]);
 			_delay_ms(100);
 		}
 		uart_printf("\n\n\rGot source caps! State: %d\n\r", fusb302_get_state());
@@ -59,7 +62,7 @@ int main(void){
 
 ISR(PORTB_PORT_vect){
 	if(PORTB.INTFLAGS & PORT_INT4_bm) {
-		PORTB.INTFLAGS = PORT_INT4_bm;
 		fusb302_IRQ();
+		PORTB.INTFLAGS = PORT_INT4_bm;
 	}
 }
