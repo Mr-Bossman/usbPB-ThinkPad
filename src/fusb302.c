@@ -22,7 +22,7 @@ void fusb302_init(){
 	_delay_ms(10);
 	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
 	fusb302_write(REG_SWITCHES0, 0x00);
-	fusb302_write(REG_MASK, ~(REG_MASK_BC_LVL|REG_MASK_ACTIVITY));
+	fusb302_write(REG_MASK, ~(REG_MASK_BC_LVL|REG_MASK_ACTIVITY | REG_MASK_COMP_CHNG));
 	fusb302_write(REG_MASKA, 0xff);
 	fusb302_write(REG_MASKB, REG_MASKB_GCRCSENT);
 	fusb302_start_dual();
@@ -74,19 +74,18 @@ static int fusb302_check_cc_state(){
 
 /* Start source */
 static int fusb302_start_src(int cc){
-	uint8_t val = 0;
-	if(fusb302_read(REG_STATUS0, &val))
-		return -1;
-	if(val & (REG_STATUS0_BC_LVL0 | REG_STATUS0_BC_LVL1))
-		state = PD_STATE_SRC;
+	cc -= 2;
+	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | (cc?REG_SWITCHES0_VCONN_CC1:REG_SWITCHES0_VCONN_CC2) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
+	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
+	state = PD_STATE_SRC;
 	return 0;
 }
 
 /* Establish usb pd wait */
 static int fusb302_establish_pd_wait(int cc){
-	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_UFP << REG_CONTROL2_MODE_POS));
+	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_DRP << REG_CONTROL2_MODE_POS));
 	fusb302_write(REG_MASK, ~(REG_MASK_BC_LVL|REG_MASK_ACTIVITY | REG_MASK_CRC_CHK));
-	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
+	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | (cc?REG_SWITCHES0_VCONN_CC1:REG_SWITCHES0_VCONN_CC2) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
 	fusb302_write(REG_CONTROL0, 0x00);
 	state = PD_STATE_SNK_WAIT;
@@ -217,7 +216,7 @@ void fusb302_IRQ(void){
 		if(fusb302_check_for_message() == 1){
 			start_timer();
 			state = PD_STATE_SNK_PD;
-			fusb302_write(REG_MASK, ~(REG_INTERRUPT_VBUSOK));
+			fusb302_write(REG_MASK, ~(REG_INTERRUPT_VBUSOK | REG_MASK_COMP_CHNG));
 			fusb302_write(REG_MASKA, 0xff);
 			/* Send ping so I dont get shut off */
 			usb_pd_request_power(5000,1);
@@ -230,6 +229,7 @@ void fusb302_IRQ(void){
 		if(!(val&REG_STATUS1_RX_EMPTY))
 			fusb302_write(REG_CONTROL1, REG_CONTROL1_RX_FLUSH);
 	} else if (state == PD_STATE_SRC) {
-		state = PD_STATE_SNK_2_0;
+		start_timer();
+		fusb302_init();
 	}
 }

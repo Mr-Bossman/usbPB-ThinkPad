@@ -11,7 +11,7 @@ void timer_callback(void)
 	if(fusb302_get_state() == PD_STATE_SNK_WAIT && get_timer() > 20){
 			fusb302_init();
 	}
-	if(!(PORTB.INTFLAGS&PORT_INT4_bm) && !(PORTB.IN&(1<<4)) && get_timer() > 30 && fusb302_get_state() != PD_STATE_SRC){
+	if(!(PORTB.INTFLAGS&PORT_INT4_bm) && !(PORTB.IN&(1<<4)) && get_timer() > 30){
 			fusb302_init();
 			usb_pd_reset_source_caps();
 	}
@@ -43,7 +43,7 @@ int main(void){
 			fusb302_read(REG_STATUS0, &intr[0]);
 			fusb302_read(REG_STATUS1, &intr[1]);
 			fusb302_read(REG_STATUS1A, &intr[2]);
-			uart_printf("\rWaiting for source caps... State: %d, Time: %d. Status: 0x%x 0x%x 0x%x\r", fusb302_get_state(),get_timer(), intr[0], intr[1], intr[2]);
+			uart_printf("\rWaiting for source caps... State: %d, Time: %d. Status: 0x%02x 0x%02x 0x%02x\r", fusb302_get_state(),get_timer(), intr[0], intr[1], intr[2]);
 			_delay_ms(100);
 		}
 		uart_printf("\n\n\rGot source caps! State: %d\n\r", fusb302_get_state());
