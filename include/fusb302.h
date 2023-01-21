@@ -181,13 +181,15 @@
 void fusb302_init();
 int fusb302_reset();
 int fusb302_id(uint8_t *id);
-int fusb302_start_sink();
+int fusb302_start_dual();
 void fusb302_IRQ(void);
 uint8_t fusb302_get_state();
 void fusb302_send_message(uint16_t header, const uint8_t* payload);
 
-#define PD_STATE_2_0 1
-#define PD_STATE_WAIT 2
-#define PD_STATE_PD 3
+#define PD_STATE_IDLE 0
+#define PD_STATE_SNK_2_0 1
+#define PD_STATE_SNK_WAIT 2
+#define PD_STATE_SNK_PD 3
+#define PD_STATE_SRC 4
 
 #endif /* __FUSB302_H */

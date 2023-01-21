@@ -8,13 +8,11 @@
 
 void timer_callback(void)
 {
-	if(fusb302_get_state() == PD_STATE_WAIT && get_timer() > 20){
+	if(fusb302_get_state() == PD_STATE_SNK_WAIT && get_timer() > 20){
 			fusb302_init();
-			fusb302_start_sink();
 	}
-	if(!(PORTB.INTFLAGS&PORT_INT4_bm) && !(PORTB.IN&(1<<4)) && get_timer() > 30){
+	if(!(PORTB.INTFLAGS&PORT_INT4_bm) && !(PORTB.IN&(1<<4)) && get_timer() > 30 && fusb302_get_state() != PD_STATE_SRC){
 			fusb302_init();
-			fusb302_start_sink();
 			usb_pd_reset_source_caps();
 	}
 }
@@ -39,7 +37,6 @@ int main(void){
 	sei();
 	i2c_init();
 	fusb302_init();
-	fusb302_start_sink();
 	while(1){
 		uint8_t intr[3];
 		while(usb_pd_get_source_caps(NULL) == 0) {
@@ -55,6 +52,10 @@ int main(void){
 		for(int i = 0; i < num_caps; i++) {
 			uart_printf("Voltage: %u, Current: %u, Type: %u, Obj_pos: %u\n\r", tmp[i].voltage, tmp[i].max_current, tmp[i].supply_type, tmp[i].obj_pos);
 		}
+					fusb302_read(REG_STATUS0, &intr[0]);
+			fusb302_read(REG_STATUS1, &intr[1]);
+			fusb302_read(REG_STATUS1A, &intr[2]);
+			uart_printf("\rWaiting for source caps... State: %d, Time: %d. Status: 0x%x 0x%x 0x%x\r", fusb302_get_state(),get_timer(), intr[0], intr[1], intr[2]);
 		_delay_ms(1000);
 	}
 	return 0;
