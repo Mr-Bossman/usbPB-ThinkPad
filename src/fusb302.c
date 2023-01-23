@@ -22,7 +22,7 @@ void fusb302_init(){
 	_delay_ms(10);
 	fusb302_write(REG_POWER, REG_POWER_PWR_ALL);
 	fusb302_write(REG_SWITCHES0, 0x00);
-	fusb302_write(REG_MASK, ~(REG_MASK_BC_LVL|REG_MASK_ACTIVITY | REG_MASK_COMP_CHNG));
+	fusb302_write(REG_MASK, ~(REG_MASK_ACTIVITY));
 	fusb302_write(REG_MASKA, 0xff);
 	fusb302_write(REG_MASKB, REG_MASKB_GCRCSENT);
 	fusb302_start_dual();
@@ -45,8 +45,9 @@ int fusb302_start_dual(){
 		return 1;
 	}
 	fusb302_write(REG_MASKA, ~REG_MASKA_TOGDONE);
-	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_DRP << REG_CONTROL2_MODE_POS) | REG_CONTROL2_TOGGLE);
+	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_DRP << REG_CONTROL2_MODE_POS) | REG_CONTROL2_TOGGLE | REG_CONTROL2_RD_ONLY);
 	fusb302_write(REG_CONTROL3, REG_CONTROL3_AUTO_RETRY | (3 << REG_CONTROL3_N_RETRIES_POS));
+	fusb302_write(REG_MEASURE,0b100110); // 1.6v for Default USB power below \/
 	fusb302_write(REG_CONTROL0, REG_CONTROL0_HOST_CUR_USB);
 	state = PD_STATE_SNK_2_0;
 	return 0;
@@ -74,9 +75,11 @@ static int fusb302_check_cc_state(){
 
 /* Start source */
 static int fusb302_start_src(int cc){
+	uint8_t val;
 	cc -= 2;
 	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | (cc?REG_SWITCHES0_VCONN_CC1:REG_SWITCHES0_VCONN_CC2) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
+	fusb302_write(REG_MASK, ~(REG_MASK_ACTIVITY | REG_MASK_BC_LVL));
 	state = PD_STATE_SRC;
 	return 0;
 }
@@ -84,7 +87,7 @@ static int fusb302_start_src(int cc){
 /* Establish usb pd wait */
 static int fusb302_establish_pd_wait(int cc){
 	fusb302_write(REG_CONTROL2, (REG_CONTROL2_MODE_DRP << REG_CONTROL2_MODE_POS));
-	fusb302_write(REG_MASK, ~(REG_MASK_BC_LVL|REG_MASK_ACTIVITY | REG_MASK_CRC_CHK));
+	fusb302_write(REG_MASK, ~(REG_MASK_ACTIVITY | REG_MASK_CRC_CHK));
 	fusb302_write(REG_SWITCHES0, (cc?REG_SWITCHES0_MEAS_CC2:REG_SWITCHES0_MEAS_CC1) | (cc?REG_SWITCHES0_VCONN_CC1:REG_SWITCHES0_VCONN_CC2) | REG_SWITCHES0_CC2_PD_EN | REG_SWITCHES0_CC1_PD_EN);
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
 	fusb302_write(REG_CONTROL0, 0x00);
@@ -189,12 +192,10 @@ void fusb302_IRQ(void){
 	fusb302_read(REG_STATUS1A, &intr[3]);
 	uart_printf("\n\rstate: %d. interrupts: 0x%x 0x%x 0x%x 0x%x\n\r",state, intr[0], intr[1], intr[2], intr[3]>>3);
 
-	if(intr[0] & REG_INTERRUPT_VBUSOK) {
+	/**/if(intr[0] & REG_INTERRUPT_VBUSOK) {
 		uint8_t tmp = 0;
 		fusb302_read(REG_STATUS0, &tmp);
-		if(tmp & REG_STATUS0_VBUSOK)
-			fusb302_write(REG_MASK, 0xff);
-		else {
+		if(!(tmp & REG_STATUS0_VBUSOK)) {
 			fusb302_init();
 			usb_pd_reset_source_caps();
 		}
@@ -216,7 +217,7 @@ void fusb302_IRQ(void){
 		if(fusb302_check_for_message() == 1){
 			start_timer();
 			state = PD_STATE_SNK_PD;
-			fusb302_write(REG_MASK, ~(REG_INTERRUPT_VBUSOK | REG_MASK_COMP_CHNG));
+			fusb302_write(REG_MASK, ~(REG_INTERRUPT_VBUSOK));
 			fusb302_write(REG_MASKA, 0xff);
 			/* Send ping so I dont get shut off */
 			usb_pd_request_power(5000,1);

@@ -60,6 +60,7 @@
 #define REG_CONTROL2   0x08
 /* two-bit field, valid values below */
 #define REG_CONTROL2_MODE      (1<<1)
+#define REG_CONTROL2_RD_ONLY   (1<<5)
 #define REG_CONTROL2_MODE_DFP  (0x3)
 #define REG_CONTROL2_MODE_UFP  (0x2)
 #define REG_CONTROL2_MODE_DRP  (0x1)
