@@ -17,6 +17,9 @@ uint16_t get_timer(void);
 /* Set callback function for WDT */
 void set_timer_callback(void (*callback)(void));
 
+/* Enable/Disable interrupt */
+void pit_IE(uint8_t IE);
+
 #define break_out(timeout)if (!wait_for_timerlock(timeout)) break
 
 #endif /* __PIT_H__ */

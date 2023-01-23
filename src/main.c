@@ -11,10 +11,6 @@ void timer_callback(void)
 	if(fusb302_get_state() == PD_STATE_SNK_WAIT && get_timer() > 20){
 			fusb302_init();
 	}
-	if(!(PORTB.INTFLAGS&PORT_INT4_bm) && !(PORTB.IN&(1<<4)) && get_timer() > 30){
-			fusb302_init();
-			usb_pd_reset_source_caps();
-	}
 }
 
 int main(void){
@@ -29,7 +25,7 @@ int main(void){
 	PORTB.PIN1CTRL = PORT_PULLUPEN_bm;
 	/* Pullups on PB4 and INT falling edge */
 	PORTB.PIN4CTRL = PORT_PULLUPEN_bm | PORT_ISC_FALLING_gc;
-	PORTC.DIRSET = (3<<2);
+	PORTC.DIRSET = (7<<1);
 	uart_init(115200);
 	uart_puts("                 ");
 	uart_puts("\e[2J\e[1;1H\n\n");
@@ -50,8 +46,10 @@ int main(void){
 			_delay_ms(100);
 			if(fusb302_get_state() == PD_STATE_SRC){
 				PORTC.OUTSET = (1<<3);
+				PORTC.DIRSET = 1;
 			} else {
 				PORTC.OUTCLR = (1<<3);
+				PORTC.DIRCLR = 1;
 			}
 		}
 		PORTC.OUTSET = (1<<2);
@@ -66,9 +64,13 @@ int main(void){
 			if(tmp[i].voltage > tmp[b].voltage)
 				b = i;
 		uart_printf("Selecting: %d, Voltage: %d, Current: %d, Wattage: %lu\n\r", b, (tmp[b].voltage/1000), tmp[b].max_current, (uint32_t)(tmp[b].voltage/1000)*(uint32_t)tmp[b].max_current);
+		usb_pd_request_power(5000,3000);
+		/* Enable sink fet*/
+		PORTC.OUTSET = (1<<1);
 		while(usb_pd_get_source_caps(NULL) != 0);
-		uart_printf("\n\n\rPSU disconnected! State: %d\n\r", fusb302_get_state());
-
+		uart_printf("\n\rPSU disconnected!\n\r");
+		/* Dissable sink fet*/
+		PORTC.OUTCLR = (1<<1);
 	}
 	return 0;
 }

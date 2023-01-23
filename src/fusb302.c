@@ -26,6 +26,7 @@ void fusb302_init(){
 	fusb302_write(REG_MASKA, 0xff);
 	fusb302_write(REG_MASKB, REG_MASKB_GCRCSENT);
 	fusb302_start_dual();
+	pit_IE(0);
 }
 
 /* Get device ID */
@@ -92,6 +93,7 @@ static int fusb302_establish_pd_wait(int cc){
 	fusb302_write(REG_SWITCHES1, REG_SWITCHES1_SPECREV0 | REG_SWITCHES1_AUTO_GCRC | (cc?REG_SWITCHES1_TXCC2_EN:REG_SWITCHES1_TXCC1_EN));
 	fusb302_write(REG_CONTROL0, 0x00);
 	state = PD_STATE_SNK_WAIT;
+	pit_IE(1);
 	start_timer();
 	return 0;
 }
@@ -215,22 +217,19 @@ void fusb302_IRQ(void){
 			fusb302_start_src(cc);
 	} else if (state == PD_STATE_SNK_WAIT) {
 		if(fusb302_check_for_message() == 1){
-			start_timer();
 			state = PD_STATE_SNK_PD;
 			fusb302_write(REG_MASK, ~(REG_INTERRUPT_VBUSOK));
 			fusb302_write(REG_MASKA, 0xff);
 			/* Send ping so I dont get shut off */
-			usb_pd_request_power(5000,1);
+			usb_pd_request_power(5000,3000);
 		}
 	} else if (state == PD_STATE_SNK_PD){
-		start_timer();
 		uint8_t val = 0;
 		if(fusb302_read(REG_STATUS1, &val))
 			return;
 		if(!(val&REG_STATUS1_RX_EMPTY))
 			fusb302_write(REG_CONTROL1, REG_CONTROL1_RX_FLUSH);
 	} else if (state == PD_STATE_SRC) {
-		start_timer();
 		fusb302_init();
 	}
 }

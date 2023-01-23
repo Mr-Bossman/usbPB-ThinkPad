@@ -35,6 +35,11 @@ uint16_t get_timer(void)
 	return timer;
 }
 
+/* Enable/Disable Pit timer Interupts */
+void pit_IE(uint8_t IE){
+	RTC.PITCTRLA = RTC_PERIOD_CYC1024_gc | (IE?RTC_PITEN_bm:0);
+}
+
 /* Init Pit timer */
 void pit_init() {
 	// Set Pit prescaler to 32ms and Enable Interrupt
